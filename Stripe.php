@@ -12,8 +12,10 @@ define( 'STRIPE_METHOD_DELETE', 'delete' );
  *
  * @copyright   Copyright (c) 2011 Pixative Solutions
  * @copyright 	Copyright (c) 2013 Sekati
+ * @copyright   Copyright (c) 2013 Kolby Sisk
  * @author      Ben Cessa <ben@pixative.com> - http://www.pixative.com
  * @author 		Jason Horwitz <jason@sekati.com>
+ * @author      Kolby Sisk <kolby.sisk@gmail.com> - http://www.kolbysisk.com
  */
 class Stripe {
 	/**
@@ -476,6 +478,132 @@ class Stripe {
 		return $this->_send_request( 'coupons?'.$vars );
 	}
 
+	/**
+	 * Register a new recipient on system
+	 *
+	 * @param  string        The recipient's full, legal name. 
+	 *						 For type individual, should be in the format "First Last", "First Middle Last", or "First M Last" (no prefixes or suffixes). 
+	 *						 For corporation, the full incorporated name
+	 * @param  string        Type of the recipient: either individual or corporation.
+	 * @param  string        The recipient's tax ID, as a string. For type individual, the full SSN; for type corporation, the full EIN.
+	 * @param  mixed         This can be a bank token generated with stripe.js ( recommended ).
+	 * @param  string        The recipient's email address.
+	 * @param  string 		 An arbitrary string which you can attach to a recipient object. It is displayed alongside the recipient in the web interface.
+	 */
+	public function recipient_create( $name, $type, $tax_id = NULL, $bank_account = NULL, $email = NULL, $description = NULL ) {
+		$params = array(
+			'name' => $name,
+			'type' => $type
+		);
+		if( $tax_id )
+			$params['tax_id'] = $tax_id;
+		if( $bank_account )
+			$params['bank_account'] = $bank_account;
+		if( $email )
+			$params['email'] = $email;
+		if( $description )
+			$params['description'] = $description;
+
+		return $this->_send_request( 'recipients', $params, STRIPE_METHOD_POST );
+	}
+
+	/**
+	 * Retrieve information for a given recipient
+	 *
+	 * @param  string        The recipient ID to get information about
+	 */
+	public function recipient_info( $recipient_id ) {
+		return $this->_send_request( 'recipients/'.$recipient_id );
+	}
+
+	/**
+	 * Update an existing recipient record
+	 *
+	 * @param  string        The recipient ID for the record to update
+	 * @param  array         An array containing the new data for the recipient
+	 *
+	 */
+	public function recipient_update( $recipient_id, $newdata ) {
+		return $this->_send_request( 'recipients/'.$recipient_id, $newdata, STRIPE_METHOD_POST );
+	}
+
+	/**
+	 * Creating a new transfer (sending funds to a third-party bank account)
+	 *
+	 * @param  int           A positive int, in cents, representing how much money to transfer.
+	 * @param  string        3-letter ISO code for currency. For dollars use USD.
+	 * @param  string        A verified recipient's ID. This should be created using recipient_create above.
+	 *                       If transferring to the bank account associated with your account use 'self'
+	 * @param  string        An arbitrary string which you can attach to a transfer object. It is displayed when in the web interface alongside the transfer.
+	 * @param  string 		 An arbitrary string which will be displayed on the recipient's bank statement. This should not include your company name, as that will already be part of the descriptor. The maximum length of this string is 15 characters; longer strings will be truncated.
+	 */
+	public function transfer_create( $amount, $currency, $recipient, $description = null, $statement_descriptor = null ) {
+		$params = array(
+			'amount' => $amount,
+			'currency' => $currency,
+			'recipient' => $recipient
+		);
+		if( $description )
+			$params['description'] = $description;
+		if( $statement_descriptor )
+			$params['statement_descriptor'] = $statement_descriptor;
+
+		return $this->_send_request( 'transfers', $params, STRIPE_METHOD_POST );
+	}
+
+	/**
+	 * Retrieve the detailas of an existing transfer
+	 *
+	 * @param  string        The transfer ID to get information about
+	 */
+	public function transfer_retrieve( $transfer_id ) {
+		return $this->_send_request( 'transfers/'.$transfer_id );
+	}
+
+	/**
+	 * Canceling a Transfer
+	 *
+	 * @param  string        The transfer ID you wish to cancel
+	 */
+	public function transfer_cancel( $transfer_id ) {
+		return $this->_send_request( 'transfers/'.$transfer_id, array(), STRIPE_METHOD_DELETE );
+	}
+
+	/**
+	 * List all transfers
+	 *
+	 * @param  int           A limit on the number of objects to be returned.
+	 * @param  string/dict   A filter on the list based on the events created date. The value can be a string with an exact UTC timestamp,
+	 *						 or it can be a dictionary with the following options:
+	 *							gt (optional)
+	 *								Return values should have been created after this timestamp.
+	 *							gte (optional)
+	 *								Return values should have been created after or equal to this timestamp.
+	 *							lt (optional)
+	 *								Return values should have been created before this timestamp.
+	 *							lte (optional)
+	 *								Return values should have been created before or equal to this timestamp.
+	 * @param  int           An offset into the list of returned items. The API will return the requested number of items starting at that offset.
+	 * @param  string        Only return transfers for the recipient specified by this recipient ID
+	 * @param  string 		 Only return transfers that have the given status: pending, paid, or failed.
+	 */
+	public function transfer_all( $count = 10, $date = null, $offset = 0, $recipient = null, $status = null ) {
+
+		if( $count )
+			$params['count'] = $count;
+		if( $date )
+			$params['date'] = $date;
+		if( $offset )
+			$params['offset'] = $offset;
+		if( $recipient )
+			$params['recipient'] = $recipient;
+		if( $status )
+			$params['status'] = $status;
+
+		$vars = http_build_query( $params, NULL, '&' );
+
+		return $this->_send_request( 'transfers?'.$vars );
+	}
 
 	/**
 	 * Private utility function that prepare and send the request to the API servers
